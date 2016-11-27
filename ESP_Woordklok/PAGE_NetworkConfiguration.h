@@ -99,9 +99,7 @@ void send_network_configuration_html()
 		}
 		 server.send ( 200, "text/html", PAGE_WaitAndReload );
 		WriteConfig();
-		ConfigureWifi();
-		AdminTimeOutCounter=0;
-		
+		ConfigureWifi();		
 	}
 	else
 	{

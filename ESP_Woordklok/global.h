@@ -5,18 +5,17 @@
 
 ESP8266WebServer server(80);									// The Webserver
 boolean firstStart = true;										// On firststart = true, NTP will try to get a valid time
-int AdminTimeOutCounter = 0;									// Counter for Disabling the AdminMode
 strDateTime DateTime;											// Global DateTime structure, will be refreshed every Second
 WiFiUDP UDPNTPClient;											// NTP Client
 unsigned long UnixTimestamp = 0;								// GLOBALTIME  ( Will be set by NTP)
 unsigned long UnixTimestamp_adjusted = 0;
-boolean Refresh = false; // For Main Loop, to refresh things like GPIO / WS2812
 boolean FirstSettings = true;
 boolean FirstPackage = false;
+boolean ConnectionStatus = false;
 int cNTP_Update = 0;											// Counter for Updating the time via NTP
 int cGet_Time_Update = 0;
 Ticker tkSecond;												// Second - Timer for Updating Datetime Structure
-boolean AdminEnabled = true;		// Enable Admin Mode for a given Time
+boolean AdminEnabled = true;           // Enable Admin Mode for a given Time
 byte Minute_Old = 100;				// Helpvariable for checking, when a new Minute comes up (for Auto Turn On / Off)
 
 
@@ -58,6 +57,12 @@ struct strConfig {
   boolean Clock_NTP_Update;
   int GetTimeMinute;
 }   config;
+
+void WriteLogLine(String LogLine){
+    File bestand = SPIFFS.open("/data.txt", "a+"); // open het bestand in schrijf modus.
+    bestand.println(String(hour()) + ":" + String(minute()) + ":" + String(second()) + " - " + LogLine);
+    bestand.close();
+}
 
 
 /*
@@ -223,7 +228,18 @@ void ReadClockConfig()
     //return true;
 }
 
+void updateConnected()
+{
+  // Called in loop, so do not call often
+  WriteLogLine("Wifi connection: " + WiFi.status());
+  WriteLogLine("Wifi should be:  " + WL_CONNECTED);
+  WriteLogLine("Wifi address:    " + WiFi.localIP());
 
+  WiFiClient client;
+  ConnectionStatus = client.connect("www.google.nl", 80);
+
+  WriteLogLine("Wifi external:   " + ConnectionStatus);
+}
 
 /*
 **
@@ -289,7 +305,6 @@ void NTPRefresh()
 void Second_Tick()
 {
 	strDateTime tempDateTime;
-	AdminTimeOutCounter++;
 	cNTP_Update++;
   cGet_Time_Update++;
 	UnixTimestamp++;
@@ -307,13 +322,10 @@ void Second_Tick()
 	{
 			DateTime = tempDateTime;
 	}
-	Refresh = true;
-}
-
-void WriteLogLine(String LogLine){
-    File bestand = SPIFFS.open("/data.txt", "a+"); // open het bestand in schrijf modus.
-    bestand.println(String(hour()) + ":" + String(minute()) + ":" + String(second()) + " - " + LogLine);
-    bestand.close();
+  // Every second if not connected; every 5 seconds if connected
+  if (!ConnectionStatus || second() % 5 == 0) {
+    updateConnected();
+  }
 }
 
 void ResetLogFile (){

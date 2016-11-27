@@ -47,7 +47,6 @@ Include the HTML, STYLE and Script "Pages"
 
 #define ACCESS_POINT_NAME  "WOORDKLOK"				
 #define ACCESS_POINT_PASSWORD  "12345678" 
-#define AdminTimeOut 240
 
 ESP8266HTTPUpdateServer httpUpdater;
 
@@ -98,15 +97,8 @@ void setup ( void ) {
 	}
 	ReadClockConfig();
 	
-	if (AdminEnabled)
-	{
-		WiFi.mode(WIFI_AP_STA);
-		WiFi.softAP( ACCESS_POINT_NAME , ACCESS_POINT_PASSWORD);
-	}
-	else
-	{
-		WiFi.mode(WIFI_STA);
-	}
+  // Always start in normal mode
+	WiFi.mode(WIFI_STA);
 
 	ConfigureWifi();
 	
@@ -134,6 +126,7 @@ void setup ( void ) {
   server.on ( "/clock.html", processClock ); 
   server.on ( "/Log.html", handle_log ); 
   server.on ( "/ResetLog.html", handle_reset ); 
+  server.on ( "/Update.html", handle_update ); 
 
  
 
@@ -162,17 +155,42 @@ void handle_reset(){
     server.send(302, "text/plain","OK");
 }
 
-void loop ( void ) {
+void handle_update(){
+    SPIFFS.end();
+    UDPNTPClient.flush();
+    UDPNTPClient.stopAll();
+    Serial.flush();
+    Serial.end();
+    delay(500);
+    
+    server.sendHeader("Location","/update");
+    server.send(302, "text/plain","OK");
+}
+
+void updateAdminMode(void) {
   
-	if (AdminEnabled)
-	{
-		if (AdminTimeOutCounter > AdminTimeOut)
-		{
-			 AdminEnabled = false;
-			 //Serial.println("Admin Mode disabled!");
-			 WiFi.mode(WIFI_STA);
-		}
-	}
+  // Admin should be enabled to be stopped as soon as there is a connection
+  if ( ConnectionStatus && AdminEnabled )
+  {
+    WriteLogLine("Admin mode stopped (connection available).");
+    AdminEnabled = false;
+    WiFi.mode(WIFI_STA);
+  }
+  
+  // If not connected, we need AP mode if it is not already enabled
+  if ( !ConnectionStatus && !AdminEnabled )
+  {
+    WriteLogLine("Admin mode enabled (no internet connection).");
+    AdminEnabled = true;
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(ACCESS_POINT_NAME, ACCESS_POINT_PASSWORD);
+  } 
+}
+
+void loop ( void ) {
+
+  updateAdminMode();
+    
 	if (config.Update_Time_Via_NTP_Every  > 0 )
 	{
 		if (cNTP_Update > 5 && firstStart)
@@ -214,11 +232,6 @@ void loop ( void ) {
     }
   }
 
-  
-
-
-
-  
 	if(minute() != Minute_Old)
 	{
 		 Minute_Old = minute();
@@ -243,29 +256,11 @@ void loop ( void ) {
 	}
 	server.handleClient();
 
-
-	/*
-	*    Your Code here
-	*/
-
   //check UART for data
   while(Serial.available()){
     Serial.setTimeout(75);
     String Ser_Input = Serial.readString();
     WriteLogLine(Ser_Input);
   }
-
-	if (Refresh)  
-	{
-		Refresh = false;
-		///Serial.println("Refreshing...");
-		 //Serial.printf("FreeMem:%d %d:%d:%d %d.%d.%d \n",ESP.getFreeHeap() , DateTime.hour,DateTime.minute, DateTime.second, DateTime.year, DateTime.month, DateTime.day);
-	}
-
-
-
- 
-
-
 }
 
