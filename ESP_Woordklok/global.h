@@ -64,7 +64,6 @@ void WriteLogLine(String LogLine){
     bestand.close();
 }
 
-
 /*
 **
 ** CONFIGURATION HANDLING
@@ -249,8 +248,9 @@ void updateConnected()
 
 const int NTP_PACKET_SIZE = 48; 
 byte packetBuffer[ NTP_PACKET_SIZE]; 
-void NTPRefresh()
+boolean NTPRefresh()
 {
+  UDPNTPClient.begin(2390);  // Port for NTP receive
 
 	
 
@@ -259,11 +259,8 @@ void NTPRefresh()
 	{
 		IPAddress timeServerIP; 
 		WiFi.hostByName(config.ntpServerName.c_str(), timeServerIP); 
-		//sendNTPpacket(timeServerIP); // send an NTP packet to a time server
 
-
-		//Serial.println("sending NTP packet...");
-//    WriteLogLine("sending NTP packet...");
+    // WriteLogLine("Sending NTP packet... ");
 		memset(packetBuffer, 0, NTP_PACKET_SIZE);
 		packetBuffer[0] = 0b11100011;   // LI, Version, Mode
 		packetBuffer[1] = 0;     // Stratum, or type of clock
@@ -277,19 +274,15 @@ void NTPRefresh()
 		UDPNTPClient.write(packetBuffer, NTP_PACKET_SIZE);
 		UDPNTPClient.endPacket();
 
-
 		delay(1000);
   
 		int cb = UDPNTPClient.parsePacket();
 		if (!cb) {
-			//Serial.println("NTP no packet yet");
-		//  WriteLogLine("NTP no packet yet");
+		  //  WriteLogLine("NTP no packet yet");
 		}
 		else 
 		{
-			//Serial.print("NTP packet received, length=");
-			//Serial.println(cb);
-	//		WriteLogLine("NTP packet received, length=" + (String) cb);
+			// WriteLogLine("NTP packet received; length: " + (String) cb);
 			UDPNTPClient.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
 			unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
 			unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
@@ -298,8 +291,14 @@ void NTPRefresh()
 			unsigned long epoch = secsSince1900 - seventyYears;
 			UnixTimestamp = epoch;
       FirstPackage = true;
+			// WriteLogLine("NTP packet time is: " + (String) epoch);
+      UDPNTPClient.flush();
+      UDPNTPClient.stop();
+      return true;
 		}
 	}
+ UDPNTPClient.stop();
+ return false;
 }
 
 void Second_Tick()
