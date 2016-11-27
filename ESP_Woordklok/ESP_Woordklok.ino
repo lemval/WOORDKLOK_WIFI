@@ -136,6 +136,7 @@ void setup ( void ) {
   server.on ( "/clock.html", processClock ); 
   server.on ( "/Log.html", handle_log ); 
   server.on ( "/ResetLog.html", handle_reset ); 
+  server.on ( "/Update.html", handle_update ); 
 
  
 
@@ -150,6 +151,18 @@ void handle_log(){
   File bestand = SPIFFS.open("/data.txt", "r");
   size_t sent = server.streamFile(bestand, "text/plain;charset=UTF-8");
   bestand.close();
+}
+
+void handle_update(){
+  SPIFFS.end();
+  UDPNTPClient.flush();
+  UDPNTPClient.stopAll();
+  Serial.flush();
+  Serial.end();
+  delay(500);
+
+  server.sendHeader("Location","/update");
+  server.send(302, "text/plain","OK");
 }
 
 void handle_reset(){
