@@ -15,7 +15,7 @@ boolean ConnectionStatus = false;
 int cNTP_Update = 0;											// Counter for Updating the time via NTP
 int cGet_Time_Update = 0;
 Ticker tkSecond;												// Second - Timer for Updating Datetime Structure
-boolean AdminEnabled = true;           // Enable Admin Mode for a given Time
+boolean AdminEnabled = false;           // Enable Admin Mode for a given Time
 byte Minute_Old = 100;				// Helpvariable for checking, when a new Minute comes up (for Auto Turn On / Off)
 
 
@@ -61,6 +61,7 @@ struct strConfig {
 void WriteLogLine(String LogLine){
     File bestand = SPIFFS.open("/data.txt", "a+"); // open het bestand in schrijf modus.
     bestand.println(String(hour()) + ":" + String(minute()) + ":" + String(second()) + " - " + LogLine);
+    Serial.println(String(hour()) + ":" + String(minute()) + ":" + String(second()) + " - " + LogLine);
     bestand.close();
 }
 
@@ -71,10 +72,11 @@ void WriteLogLine(String LogLine){
 */
 void ConfigureWifi()
 {
-	//Serial.println("Configuring Wifi");
+	WriteLogLine("Starting Wifi");
 	WiFi.begin (config.ssid.c_str(), config.password.c_str());
 	if (!config.dhcp)
 	{
+    WriteLogLine("Configure Wifi with " + IPAddress(config.IP[0],config.IP[1],config.IP[2],config.IP[3] ).toString());
 		WiFi.config(IPAddress(config.IP[0],config.IP[1],config.IP[2],config.IP[3] ),  IPAddress(config.Gateway[0],config.Gateway[1],config.Gateway[2],config.Gateway[3] ) , IPAddress(config.Netmask[0],config.Netmask[1],config.Netmask[2],config.Netmask[3] ));
 	}
 }
@@ -229,15 +231,16 @@ void ReadClockConfig()
 
 void updateConnected()
 {
-  // Called in loop, so do not call often
-  WriteLogLine("Wifi connection: " + WiFi.status());
-  WriteLogLine("Wifi should be:  " + WL_CONNECTED);
-  WriteLogLine("Wifi address:    " + WiFi.localIP());
+  if ( WiFi.status() == WL_CONNECTED ) {
+    WriteLogLine("Wifi got address: " + WiFi.localIP());
 
-  WiFiClient client;
-  ConnectionStatus = client.connect("www.google.nl", 80);
-
-  WriteLogLine("Wifi external:   " + ConnectionStatus);
+    WiFiClient client;
+    int status = client.connect("www.google.com", 80);
+    WriteLogLine("Wifi connect:   " + (String) status);
+    ConnectionStatus = (status == 0);
+  }
+  
+  WriteLogLine("ConnectionStatus: '" + String(ConnectionStatus) + String("'"));
 }
 
 /*
@@ -321,9 +324,9 @@ void Second_Tick()
 	{
 			DateTime = tempDateTime;
 	}
-  // Every second if not connected; every 5 seconds if connected
-  if (!ConnectionStatus || second() % 5 == 0) {
-    updateConnected();
+
+  if (second() % 15 == 0) {
+     updateConnected();
   }
 }
 
